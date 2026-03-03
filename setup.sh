@@ -2,11 +2,12 @@
 # One-command setup: run from your laptop to install eidf-dev on the cluster
 # and print the SSH config you need for Cursor/ssh eidf-dev.
 #
-# Usage:
-#   ./setup.sh [CLUSTER_SSH_HOST]
+# Usage (bash works even if the file isn't executable after git clone):
+#   bash setup.sh [CLUSTER_SSH_HOST]
+#   ./setup.sh eidf_cluster   # or chmod +x setup.sh first
 #
-# Example (if you already have "eidf_cluster" in ~/.ssh/config):
-#   cd eidf-dev && ./setup.sh eidf_cluster
+# Example:
+#   cd eidf-dev && bash setup.sh eidf_cluster
 #
 # This script:
 #   1. Syncs this eidf-dev folder to the cluster at ~/eidf-dev/

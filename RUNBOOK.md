@@ -9,10 +9,10 @@
 
 ```bash
 cd eidf-dev
-./setup.sh
+bash setup.sh
 ```
 
-Enter your SSH host alias for the cluster (e.g. `eidf_cluster`) when prompted, or: `./setup.sh eidf_cluster`.
+Enter your SSH host alias for the cluster (e.g. `eidf_cluster`) when prompted, or: `bash setup.sh eidf_cluster`. (If you get "Permission denied" with `./setup.sh`, use `bash setup.sh`.)
 
 Add the printed SSH block to your `~/.ssh/config`.
 

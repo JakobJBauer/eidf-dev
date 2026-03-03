@@ -14,11 +14,13 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
 
    ```bash
    cd eidf-dev
-   ./setup.sh
+   bash setup.sh
    ```
 
+   If you get "Permission denied", use `bash setup.sh` (no execute bit needed) or run `chmod +x setup.sh` then `./setup.sh`.
+
    When prompted, enter your **SSH host alias** for the cluster (e.g. `eidf_cluster`).  
-   Or pass it directly: `./setup.sh eidf_cluster`
+   Or pass it directly: `bash setup.sh eidf_cluster`
 
 3. **Add the printed SSH block** to your laptop’s `~/.ssh/config` (the script fills in your cluster host).
 
@@ -32,14 +34,14 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
    You’ll be prompted for **GPUs**, **Memory**, **GPU type** (if GPUs > 0), and **PVC** (your PVCs are listed from `kubectl`; default is `$USER-ws1` if it exists). The script creates the job, waits for the pod, copies your SSH keys, and starts the port-forward.
 
 5. **From your laptop**: `ssh eidf-dev` or in Cursor **Remote-SSH: Connect to Host… → eidf-dev**.  
-   You land in the pod as `root`. Workspace is at `/workspace`; a **writeable** directory is created at `/workspace/writeable` if the PVC is mounted.
+   You land in the pod as `root`. Your shell starts in **`/workspace/writeable`** (created automatically when the pod starts). The full workspace is at `/workspace` when a PVC is mounted.
 
 ---
 
 ## How it works
 
 - **On the cluster**, `$USER` is set (e.g. `s2838806-eidf107`). All scripts use `EIDF_USER="${EIDF_USER:-$USER}"` so they work for any user without editing.
-- **PVCs** are inferred with `kubectl get pvc`; you can pick one from the list or type a name. Default is `$USER-ws1` when it exists.
+- **PVCs** are inferred with `kubectl get pvc`; you can pick one from the list or type a name. Default is `$USER-ws1` when it exists. If the PVC doesn't exist yet, the script will offer to create it (interactive name and size).
 - **Pods** are found by label `eidf/user=$USER`; the connect script prefers pods whose name contains `$USER-dev` (the ones created by `eidf-dev-up.sh`).
 - **Port** is 22222 by default; override with `EIDF_DEV_PORT`. Queue is `eidf107ns-user-queue` by default; override with `EIDF_QUEUE`.
 
@@ -50,8 +52,24 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
 | Script | Where to run | Purpose |
 |--------|----------------|--------|
 | **setup.sh** | Laptop | One-time: syncs `eidf-dev/` to cluster, prints SSH config |
-| **eidf-dev-up.sh** | Cluster login node | Interactive: create dev job (GPU/RAM/PVC), wait for pod, copy keys, port-forward |
+| **eidf-dev-up.sh** | Cluster login node | Interactive: create dev job (GPU/RAM/PVC), wait for pod, copy keys, port-forward. If the chosen PVC doesn't exist, it will offer to create it. |
+| **eidf-create-pvc.sh** | Cluster login node | Create a new PVC (name and size). Run standalone or when eidf-dev-up.sh prompts. Usage: `bash eidf-create-pvc.sh` or `bash eidf-create-pvc.sh my-pvc 100Gi` |
 | **connect-dev.sh** | Cluster login node | Connect only: copy keys + port-forward to an existing dev pod |
+
+---
+
+## Creating a PVC (standalone)
+
+If you want to create a PVC without running the dev pod script:
+
+```bash
+ssh YOUR_CLUSTER_HOST
+bash ~/eidf-dev/eidf-create-pvc.sh
+```
+
+You'll be prompted for the PVC name (default `$USER-ws1`) and storage size (e.g. `100Gi`, `500Gi`, `1Ti`). To pass them directly: `bash ~/eidf-dev/eidf-create-pvc.sh my-pvc 100Gi`.
+
+The script uses the cluster template at `/opt/infk8s/templates/pvc.yml` if present; otherwise it creates a generic PVC (set `EIDF_PVC_STORAGE_CLASS` if your cluster uses a different storage class).
 
 ---
 

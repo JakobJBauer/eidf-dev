@@ -11,6 +11,7 @@ EIDF_USER="${EIDF_USER:-$USER}"
 PORT="${EIDF_DEV_PORT:-22222}"
 BASE_NAME="${EIDF_USER}-dev-"
 EIDF_QUEUE="${EIDF_QUEUE:-eidf107ns-user-queue}"
+EIDF_DEV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 
 echo ""
 echo "==== EIDF dev pod – create and connect ===="
@@ -83,6 +84,26 @@ else
 fi
 PVC_NAME="${PVC_IN:-$DEFAULT_PVC}"
 [[ "$PVC_NAME" == "none" || "$PVC_NAME" == "n" ]] && PVC_NAME=""
+
+# If user chose a PVC that doesn't exist, offer to create it
+if [[ -n "$PVC_NAME" ]] && ! kubectl get pvc "$PVC_NAME" -o name &>/dev/null; then
+  echo "PVC '$PVC_NAME' not found."
+  read -p "Create it now? (y/n) [y] " CREATE_PVC
+  CREATE_PVC="${CREATE_PVC:-y}"
+  if [[ "$CREATE_PVC" == "y" || "$CREATE_PVC" == "Y" ]]; then
+    echo "Common sizes: 100Gi, 500Gi, 1Ti, 2.5Ti"
+    read -p "Storage size? [100Gi] " PVC_STORAGE
+    PVC_STORAGE="${PVC_STORAGE:-100Gi}"
+    bash "$EIDF_DEV_DIR/eidf-create-pvc.sh" "$PVC_NAME" "$PVC_STORAGE"
+    if ! kubectl get pvc "$PVC_NAME" -o name &>/dev/null; then
+      echo "Failed to create PVC. Exiting."
+      exit 1
+    fi
+  else
+    echo "Exiting. Create a PVC with: bash ~/eidf-dev/eidf-create-pvc.sh"
+    exit 1
+  fi
+fi
 
 if [[ -n "$PVC_NAME" ]]; then
   echo "→ PVC: $PVC_NAME (mount at /workspace, writeable at /workspace/writeable)"
@@ -167,6 +188,7 @@ spec:
               touch /root/.ssh/authorized_keys
               chmod 700 /root/.ssh
               chmod 600 /root/.ssh/authorized_keys
+              echo 'cd /workspace/writeable 2>/dev/null || true' >> /root/.bashrc
               sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
               ssh-keygen -A
               /usr/sbin/sshd

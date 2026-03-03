@@ -1,0 +1,15 @@
+# PVC template – same format as EIDF cluster /opt/infk8s/templates/pvc.yml
+# Variables: PVCNAME, USER, STORAGE (filled by eidf-create-pvc.sh via envsubst)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $PVCNAME
+  labels:
+    eidf/user: $USER
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: $STORAGE
+  storageClassName: csi-cephfs-sc
