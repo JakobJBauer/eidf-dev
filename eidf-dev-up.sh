@@ -59,11 +59,12 @@ if [ "$GPU_COUNT" -gt 0 ]; then
         nvidia.com/gpu.product: ${GPU_PRODUCT}"
 fi
 
-# --- PVC: infer from kubectl, default to ${USER}-ws1 if present ---
+# --- PVC: infer from kubectl; only list PVCs that belong to this user (name starts with $EIDF_USER-) ---
+ALL_PVCS=$(kubectl get pvc -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | sort -u)
 PVC_LIST=()
 while IFS= read -r line; do
-  [[ -n "$line" ]] && PVC_LIST+=("$line")
-done < <(kubectl get pvc -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | sort -u)
+  [[ -n "$line" && "$line" == "${EIDF_USER}-"* ]] && PVC_LIST+=("$line")
+done <<< "$ALL_PVCS"
 DEFAULT_PVC=""
 for p in "${PVC_LIST[@]}"; do
   if [[ "$p" == "${EIDF_USER}-ws1" ]]; then
@@ -77,6 +78,7 @@ if [[ ${#PVC_LIST[@]} -gt 0 ]]; then
   echo "Your PVCs: ${PVC_LIST[*]}"
   read -p "Mount PVC (claim name; 'none' for no PVC)? [${DEFAULT_PVC}] " PVC_IN
 else
+  echo "No PVCs found for ${EIDF_USER}. You can type a PVC name if you have access, or 'none'."
   read -p "Mount PVC (claim name; 'none' for no PVC)? [] " PVC_IN
 fi
 PVC_NAME="${PVC_IN:-$DEFAULT_PVC}"
@@ -125,7 +127,7 @@ fi
 echo ""
 echo "Creating dev job..."
 
-cat <<EOF | kubectl apply -f -
+cat <<EOF | kubectl create -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -208,6 +210,20 @@ if [[ "$(kubectl get pod "$POD_NAME" -o jsonpath='{.status.phase}' 2>/dev/null)"
 fi
 
 echo "Pod ready: $POD_NAME"
+
+# --- Wait for sshd to be listening inside the pod (apt-get install + sshd take a minute) ---
+echo "Waiting for SSH to start in pod..."
+for i in $(seq 1 90); do
+  if kubectl exec "$POD_NAME" -- bash -c 'echo >/dev/tcp/127.0.0.1/22' 2>/dev/null; then
+    break
+  fi
+  sleep 2
+done
+if ! kubectl exec "$POD_NAME" -- bash -c 'echo >/dev/tcp/127.0.0.1/22' 2>/dev/null; then
+  echo "SSH did not start in pod within 3 minutes. Check: kubectl logs $POD_NAME"
+  exit 1
+fi
+echo "SSH ready in pod."
 
 # --- Copy keys ---
 (sss_ssh_authorizedkeys "$USER" 2>/dev/null; cat ~/.ssh/*.pub 2>/dev/null) | sort -u \
