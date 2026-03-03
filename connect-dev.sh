@@ -18,14 +18,38 @@ get_pod() {
     echo "$1"
     return
   fi
-  # Prefer pod from our Job (name contains ${EIDF_USER}-dev), else any dev pod for this user
+  # List all running dev pods for this user (name contains ${EIDF_USER}-dev-)
   local pods
-  pods=$(kubectl get pods -l "eidf/user=${EIDF_USER}" --field-selector=status.phase=Running -o name 2>/dev/null | sed 's|pod/||' | grep -- "-dev-")
-  if echo "$pods" | grep -q "${EIDF_USER}-dev"; then
-    echo "$pods" | grep "${EIDF_USER}-dev" | head -n1
-  else
-    echo "$pods" | head -n1
+  pods=$(kubectl get pods -l "eidf/user=${EIDF_USER}" --field-selector=status.phase=Running -o name 2>/dev/null | sed 's|pod/||' | grep -- "-dev-" || true)
+
+  # No pods
+  if [[ -z "$pods" ]]; then
+    return
   fi
+
+  # Single pod -> just use it
+  if [[ "$(echo "$pods" | wc -l)" -eq 1 ]]; then
+    echo "$pods"
+    return
+  fi
+
+  # Multiple pods -> let user pick
+  echo "Multiple running dev pods found for user ${EIDF_USER}:"
+  local i=1
+  while IFS= read -r p; do
+    echo "  $i) $p"
+    i=$((i+1))
+  done <<< "$pods"
+
+  local choice
+  while true; do
+    read -p "Select pod [1-$(echo "$pods" | wc -l)]: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -le $(echo "$pods" | wc -l) ]]; then
+      echo "$(echo "$pods" | sed -n "${choice}p")"
+      return
+    fi
+    echo "Invalid choice. Please enter a number between 1 and $(echo "$pods" | wc -l)."
+  done
 }
 
 copy_keys() {
