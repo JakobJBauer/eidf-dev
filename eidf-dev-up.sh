@@ -60,6 +60,22 @@ if [ "$GPU_COUNT" -gt 0 ]; then
         nvidia.com/gpu.product: ${GPU_PRODUCT}"
 fi
 
+# --- CPUs (min 4; default 2+4*GPUs when GPUs > 0, else 4) ---
+if [ "$GPU_COUNT" -gt 0 ]; then
+  DEFAULT_CPU=$((2 + 4 * GPU_COUNT))
+else
+  DEFAULT_CPU=4
+fi
+[ "$DEFAULT_CPU" -lt 4 ] && DEFAULT_CPU=4
+read -p "CPUs? [${DEFAULT_CPU}] " CPU_IN
+CPU_COUNT="${CPU_IN:-$DEFAULT_CPU}"
+if ! [[ "$CPU_COUNT" =~ ^[0-9]+$ ]]; then
+  echo "Invalid CPU count."
+  exit 1
+fi
+[ "$CPU_COUNT" -lt 4 ] && CPU_COUNT=4
+echo "→ CPUs: $CPU_COUNT"
+
 # --- PVC: list your PVCs or create a new one ---
 ALL_PVCS=$(kubectl get pvc -o go-template='{{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' 2>/dev/null | sort -u)
 PVC_LIST=()
@@ -121,21 +137,21 @@ if [ "$GPU_COUNT" -eq 0 ]; then
   RESOURCES="
           resources:
             limits:
-              cpu: 4
+              cpu: ${CPU_COUNT}
               memory: ${RAM_GB}Gi
             requests:
-              cpu: 2
+              cpu: ${CPU_COUNT}
               memory: $(( RAM_GB > 2 ? RAM_GB/2 : 1 ))Gi"
 else
   RESOURCES="
           resources:
             limits:
               nvidia.com/gpu: ${GPU_COUNT}
-              cpu: 4
+              cpu: ${CPU_COUNT}
               memory: ${RAM_GB}Gi
             requests:
               nvidia.com/gpu: ${GPU_COUNT}
-              cpu: 2
+              cpu: ${CPU_COUNT}
               memory: $(( RAM_GB > 2 ? RAM_GB/2 : 1 ))Gi"
 fi
 
