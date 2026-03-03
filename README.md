@@ -31,7 +31,7 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
    source ~/eidf-dev/eidf-dev-up.sh
    ```
 
-   You’ll be prompted for **GPUs**, **Memory**, **GPU type** (if GPUs > 0), and **PVC** (your PVCs are listed from `kubectl`; default is `$USER-ws1` if it exists). The script creates the job, waits for the pod, copies your SSH keys, and starts the port-forward.
+   You’ll be prompted for **GPUs**, **Memory**, **GPU type** (if GPUs > 0), and **PVC**: pick an existing PVC (numbered list), create a new one (name + size), or no PVC. The script creates the job, waits for the pod, copies your SSH keys, and starts the port-forward.
 
 5. **From your laptop**: `ssh eidf-dev` or in Cursor **Remote-SSH: Connect to Host… → eidf-dev**.  
    You land in the pod as `root`. Your shell starts in **`/workspace/writeable`** (created automatically when the pod starts). The full workspace is at `/workspace` when a PVC is mounted.
@@ -41,7 +41,7 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
 ## How it works
 
 - **On the cluster**, `$USER` is set (e.g. `s2838806-eidf107`). All scripts use `EIDF_USER="${EIDF_USER:-$USER}"` so they work for any user without editing.
-- **PVCs** are inferred with `kubectl get pvc`; you can pick one from the list or type a name. Default is `$USER-ws1` when it exists. If the PVC doesn't exist yet, the script will offer to create it (interactive name and size).
+- **PVC choice**: you get a numbered list of your existing PVCs, plus **“Create a new PVC”** (prompts for name and size, then uses it) and **“No PVC”**.
 - **Pods** are found by label `eidf/user=$USER`; the connect script prefers pods whose name contains `$USER-dev` (the ones created by `eidf-dev-up.sh`).
 - **Port** is 22222 by default; override with `EIDF_DEV_PORT`. Queue is `eidf107ns-user-queue` by default; override with `EIDF_QUEUE`.
 
@@ -115,3 +115,5 @@ pkill -f 'port-forward.*22222:22'
 - **Connection refused to eidf-dev** – On the login node run `source ~/eidf-dev/connect-dev.sh` again so the port-forward is active.
 - **Permission denied (publickey)** – Ensure you ran the connect script so your keys were copied into the pod.
 - **2FA** – The first hop (your cluster host) will still ask for your authenticator; after that, `eidf-dev` uses key-based auth.
+- **PVC stuck in “Terminating”** – Scripts ignore Terminating PVCs (they won’t appear in “Your PVCs” and selecting one by name will trigger “create it?”). To force-remove a stuck PVC (only if you’re sure nothing needs it):  
+  `kubectl patch pvc YOUR_PVC_NAME -p '{"metadata":{"finalizers":null}}' --type=merge`

@@ -60,49 +60,44 @@ if [ "$GPU_COUNT" -gt 0 ]; then
         nvidia.com/gpu.product: ${GPU_PRODUCT}"
 fi
 
-# --- PVC: infer from kubectl; only list PVCs that belong to this user (name starts with $EIDF_USER-) ---
-ALL_PVCS=$(kubectl get pvc -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | sort -u)
+# --- PVC: list your PVCs or create a new one ---
+ALL_PVCS=$(kubectl get pvc -o go-template='{{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' 2>/dev/null | sort -u)
 PVC_LIST=()
 while IFS= read -r line; do
   [[ -n "$line" && "$line" == "${EIDF_USER}-"* ]] && PVC_LIST+=("$line")
 done <<< "$ALL_PVCS"
-DEFAULT_PVC=""
-for p in "${PVC_LIST[@]}"; do
-  if [[ "$p" == "${EIDF_USER}-ws1" ]]; then
-    DEFAULT_PVC="$p"
-    break
-  fi
-done
-[[ -z "$DEFAULT_PVC" && ${#PVC_LIST[@]} -gt 0 ]] && DEFAULT_PVC="${PVC_LIST[0]}"
 
+echo "Mount a PVC:"
 if [[ ${#PVC_LIST[@]} -gt 0 ]]; then
-  echo "Your PVCs: ${PVC_LIST[*]}"
-  read -p "Mount PVC (claim name; 'none' for no PVC)? [${DEFAULT_PVC}] " PVC_IN
-else
-  echo "No PVCs found for ${EIDF_USER}. You can type a PVC name if you have access, or 'none'."
-  read -p "Mount PVC (claim name; 'none' for no PVC)? [] " PVC_IN
+  for i in $(seq 1 ${#PVC_LIST[@]}); do
+    echo "  $i) ${PVC_LIST[$((i-1))]}"
+  done
 fi
-PVC_NAME="${PVC_IN:-$DEFAULT_PVC}"
-[[ "$PVC_NAME" == "none" || "$PVC_NAME" == "n" ]] && PVC_NAME=""
+echo "  c) Create a new PVC"
+echo "  0) No PVC"
+DEFAULT_CHOICE="0"
+[[ ${#PVC_LIST[@]} -gt 0 ]] && DEFAULT_CHOICE="1"
+read -p "Choice [${DEFAULT_CHOICE}]: " PVC_CHOICE
+PVC_CHOICE="${PVC_CHOICE:-$DEFAULT_CHOICE}"
 
-# If user chose a PVC that doesn't exist, offer to create it
-if [[ -n "$PVC_NAME" ]] && ! kubectl get pvc "$PVC_NAME" -o name &>/dev/null; then
-  echo "PVC '$PVC_NAME' not found."
-  read -p "Create it now? (y/n) [y] " CREATE_PVC
-  CREATE_PVC="${CREATE_PVC:-y}"
-  if [[ "$CREATE_PVC" == "y" || "$CREATE_PVC" == "Y" ]]; then
-    echo "Common sizes: 100Gi, 500Gi, 1Ti, 2.5Ti"
-    read -p "Storage size? [100Gi] " PVC_STORAGE
-    PVC_STORAGE="${PVC_STORAGE:-100Gi}"
-    bash "$EIDF_DEV_DIR/eidf-create-pvc.sh" "$PVC_NAME" "$PVC_STORAGE"
-    if ! kubectl get pvc "$PVC_NAME" -o name &>/dev/null; then
-      echo "Failed to create PVC. Exiting."
-      exit 1
-    fi
-  else
-    echo "Exiting. Create a PVC with: bash ~/eidf-dev/eidf-create-pvc.sh"
-    exit 1
-  fi
+PVC_NAME=""
+if [[ "$PVC_CHOICE" == "0" || "$PVC_CHOICE" == "n" || "$PVC_CHOICE" == "none" ]]; then
+  PVC_NAME=""
+elif [[ "$PVC_CHOICE" == "c" || "$PVC_CHOICE" == "C" || "$PVC_CHOICE" == "new" ]]; then
+  read -p "New PVC name? [${EIDF_USER}-ws1] " NEW_PVC_NAME
+  NEW_PVC_NAME="${NEW_PVC_NAME:-${EIDF_USER}-ws1}"
+  echo "Common sizes: 100Gi, 500Gi, 1Ti, 2.5Ti"
+  read -p "Storage size? [100Gi] " NEW_PVC_SIZE
+  NEW_PVC_SIZE="${NEW_PVC_SIZE:-100Gi}"
+  bash "$EIDF_DEV_DIR/eidf-create-pvc.sh" "$NEW_PVC_NAME" "$NEW_PVC_SIZE" || exit 1
+  PVC_NAME="$NEW_PVC_NAME"
+  echo "→ Using newly created PVC: $PVC_NAME"
+elif [[ "$PVC_CHOICE" =~ ^[0-9]+$ ]] && [[ "$PVC_CHOICE" -ge 1 && "$PVC_CHOICE" -le ${#PVC_LIST[@]} ]]; then
+  PVC_NAME="${PVC_LIST[$((PVC_CHOICE-1))]}"
+  echo "→ PVC: $PVC_NAME"
+else
+  echo "Invalid choice. Exiting."
+  exit 1
 fi
 
 if [[ -n "$PVC_NAME" ]]; then

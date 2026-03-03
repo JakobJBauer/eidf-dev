@@ -23,8 +23,8 @@ echo ""
 PVC_NAME="$1"
 STORAGE="$2"
 
-# Show existing PVCs and prompt for name/size if not given
-ALL_PVCS=$(kubectl get pvc -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | sort -u)
+# Show existing PVCs (exclude Terminating) and prompt for name/size if not given
+ALL_PVCS=$(kubectl get pvc -o go-template='{{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' 2>/dev/null | sort -u)
 MY_PVCS=()
 while IFS= read -r line; do
   [[ -n "$line" && "$line" == "${EIDF_USER}-"* ]] && MY_PVCS+=("$line")

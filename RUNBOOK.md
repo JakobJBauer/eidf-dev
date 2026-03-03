@@ -39,7 +39,7 @@ Answer the prompts:
 - **GPUs:** 0 (CPU-only) or 1, 2, …
 - **Memory (Gi):** default 16 (0 GPU) or 50×GPUs
 - **GPU type** (if GPUs > 0): 1=H200, 2=H100 80GB, 3=A100 40GB, 4=A100 80GB
-- **PVC:** your PVCs are listed from `kubectl`; default is `$USER-ws1` if it exists. Type `none` for no PVC.
+- **PVC:** choose by number from your existing PVCs, **c** to create a new PVC (then enter name and size), or **0** for no PVC.
 
 The script creates the job, waits for the pod, copies your keys, and starts the port-forward. Workspace is at `/workspace`; `/workspace/writeable` is created if needed.
 
