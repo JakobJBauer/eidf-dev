@@ -183,7 +183,7 @@ spec:
       ${NODE_SELECTOR}
       containers:
         - name: dev
-          image: ubuntu:22.04
+          image: ubuntu:24.04
           ports:
             - containerPort: 22
               protocol: TCP
@@ -194,11 +194,13 @@ spec:
             - |
               set -e
               apt-get update
-              apt-get install -y openssh-server rsync nano htop
+              apt-get install -y openssh-server rsync nano htop tmux
               mkdir -p /var/run/sshd /root/.ssh /workspace/writeable
               touch /root/.ssh/authorized_keys
               chmod 700 /root/.ssh
               chmod 600 /root/.ssh/authorized_keys
+              [ -f /root/.bashrc ] || cp /etc/skel/.bashrc /root/.bashrc
+              sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/' /root/.bashrc || true
               echo 'cd /workspace/writeable 2>/dev/null || true' >> /root/.bashrc
               sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
               ssh-keygen -A
@@ -219,7 +221,7 @@ if [[ -z "$JOB_NAME" ]]; then
   JOB_NAME=$(kubectl get jobs -l "eidf/user=${EIDF_USER}" -o name 2>/dev/null | tail -n1 | sed 's|job.batch/||')
 fi
 
-echo "Waiting for pod (job: $JOB_NAME)..."
+echo "Waiting for pod (job: $JOB_NAME). This might take up to 4 minutes..."
 POD_NAME=""
 for i in $(seq 1 120); do
   POD_NAME=$(kubectl get pods -l "job-name=${JOB_NAME}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -245,7 +247,7 @@ fi
 echo "Pod ready: $POD_NAME"
 
 # --- Wait for sshd to be listening inside the pod (apt-get install + sshd take a minute) ---
-echo "Waiting for SSH to start in pod..."
+echo "Waiting for SSH to start in pod. This might take up to 3 minutes..."
 for i in $(seq 1 90); do
   if kubectl exec "$POD_NAME" -- bash -c 'echo >/dev/tcp/127.0.0.1/22' 2>/dev/null; then
     break
