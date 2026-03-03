@@ -1,0 +1,63 @@
+# Static template for a dev pod with SSH (no PVC).
+# For any user and optional PVC/GPU, use:  source ~/eidf-dev/eidf-dev-up.sh
+#
+# If you use this file directly, replace YOUR_EIDF_USER with your cluster username
+# (same as $USER on the login node, e.g. s2838806-eidf107).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: YOUR_EIDF_USER-dev-
+  labels:
+    eidf/user: YOUR_EIDF_USER
+    kueue.x-k8s.io/queue-name: eidf107ns-user-queue
+    kueue.x-k8s.io/priority-class: batch-workload-priority
+  annotations:
+    eidf/user: your-username
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        eidf/user: YOUR_EIDF_USER
+    spec:
+      activeDeadlineSeconds: 43200
+      restartPolicy: Never
+      containers:
+        - name: dev
+          image: ubuntu:22.04
+          ports:
+            - containerPort: 22
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          workingDir: /workspace
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              apt-get update
+              apt-get install -y openssh-server rsync nano htop
+              mkdir -p /var/run/sshd /root/.ssh /workspace/writeable
+              touch /root/.ssh/authorized_keys
+              chmod 700 /root/.ssh
+              chmod 600 /root/.ssh/authorized_keys
+              sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+              ssh-keygen -A
+              /usr/sbin/sshd
+              sleep infinity
+          resources:
+            limits:
+              nvidia.com/gpu: 0
+              cpu: 4
+              memory: 16Gi
+            requests:
+              cpu: 2
+              memory: 8Gi
+      # Uncomment and set claimName to mount a PVC at /workspace
+      # volumes:
+      #   - name: workspace
+      #     persistentVolumeClaim:
+      #       claimName: YOUR_PVC_NAME
+      # volumeMounts (in container):
+      #   - name: workspace
+      #     mountPath: /workspace

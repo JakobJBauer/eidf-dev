@@ -1,0 +1,11 @@
+# Add this block to ~/.ssh/config on your laptop.
+# Replace YOUR_CLUSTER_SSH_HOST with the Host you use to log in (e.g. eidf_cluster).
+# Then:  ssh eidf-dev   or Cursor: Remote-SSH → eidf-dev
+
+Host eidf-dev
+    HostName localhost
+    Port 22222
+    User root
+    ProxyJump YOUR_CLUSTER_SSH_HOST
+    StrictHostKeyChecking accept-new
+    UserKnownHostsFile /dev/null
