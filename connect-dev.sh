@@ -35,20 +35,26 @@ get_pod() {
 
   # Multiple pods -> let user pick
   echo "Multiple running dev pods found for user ${EIDF_USER}:"
-  local i=1
+  # Load into array for stable indexing
+  local choice
+  local -a pod_list=()
   while IFS= read -r p; do
-    echo "  $i) $p"
-    i=$((i+1))
+    [[ -n "$p" ]] && pod_list+=("$p")
   done <<< "$pods"
 
-  local choice
+  local total=${#pod_list[@]}
+  local i
+  for ((i=0; i<total; i++)); do
+    echo "  $((i+1))) ${pod_list[$i]}"
+  done
+
   while true; do
-    read -p "Select pod [1-$(echo "$pods" | wc -l)]: " choice
-    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -le $(echo "$pods" | wc -l) ]]; then
-      echo "$(echo "$pods" | sed -n "${choice}p")"
+    read -p "Select pod [1-${total}]: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 && "$choice" -le ${total} ]]; then
+      echo "${pod_list[$((choice-1))]}"
       return
     fi
-    echo "Invalid choice. Please enter a number between 1 and $(echo "$pods" | wc -l)."
+    echo "Invalid choice. Please enter a number between 1 and ${total}."
   done
 }
 

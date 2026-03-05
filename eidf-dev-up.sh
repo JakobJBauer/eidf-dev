@@ -9,6 +9,10 @@ set -e
 # On EIDF login node, $USER is set (e.g. s2838806-eidf107). Override with EIDF_USER if needed.
 EIDF_USER="${EIDF_USER:-$USER}"
 PORT="${EIDF_DEV_PORT:-22222}"
+# Public HF data mount: EIDF_PUBLIC_HF=0 to disable (default: 1 = enabled)
+ENABLE_PUBLIC_HF="${EIDF_PUBLIC_HF:-1}"
+# NFS server for public HF; override with INFK8S_NFS_SERVER_IP if set
+HF_NFS_SERVER="${INFK8S_NFS_SERVER_IP:-10.24.1.255}"
 BASE_NAME="${EIDF_USER}-dev-"
 EIDF_QUEUE="${EIDF_QUEUE:-eidf107ns-user-queue}"
 EIDF_DEV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
@@ -116,20 +120,45 @@ else
   exit 1
 fi
 
+VOLUME_ENTRIES=""
+MOUNT_ENTRIES=""
+
 if [[ -n "$PVC_NAME" ]]; then
   echo "→ PVC: $PVC_NAME (mount at /workspace, writeable at /workspace/writeable)"
-  PVC_VOLUME="
-      volumes:
+  VOLUME_ENTRIES="${VOLUME_ENTRIES}
         - name: workspace
           persistentVolumeClaim:
             claimName: ${PVC_NAME}"
-  PVC_MOUNT="
-          volumeMounts:
+  MOUNT_ENTRIES="${MOUNT_ENTRIES}
             - name: workspace
               mountPath: /workspace"
+fi
+
+if [[ "$ENABLE_PUBLIC_HF" == "1" ]]; then
+  echo "→ Public HF data: mounted at /hf (set EIDF_PUBLIC_HF=0 to disable)"
+  VOLUME_ENTRIES="${VOLUME_ENTRIES}
+        - name: publicdata
+          nfs:
+            server: ${INFK8S_PUBLIC_DATA_NFS_HOST_IP}
+            path: /public/hf"
+  MOUNT_ENTRIES="${MOUNT_ENTRIES}
+            - name: publicdata
+              mountPath: /hf
+              readOnly: true"
+fi
+
+if [[ -n "$VOLUME_ENTRIES" ]]; then
+  VOLUMES_BLOCK="
+      volumes:${VOLUME_ENTRIES}"
 else
-  PVC_VOLUME=""
-  PVC_MOUNT=""
+  VOLUMES_BLOCK=""
+fi
+
+if [[ -n "$MOUNT_ENTRIES" ]]; then
+  MOUNTS_BLOCK="
+          volumeMounts:${MOUNT_ENTRIES}"
+else
+  MOUNTS_BLOCK=""
 fi
 
 # --- Resource block: omit GPU when 0 ---
@@ -207,8 +236,8 @@ spec:
               /usr/sbin/sshd
               sleep infinity
           ${RESOURCES}
-          ${PVC_MOUNT}
-      ${PVC_VOLUME}
+          ${MOUNTS_BLOCK}
+      ${VOLUMES_BLOCK}
 EOF
 
 # --- Get job name from apply output (we need to re-run to capture it, or use get jobs) ---

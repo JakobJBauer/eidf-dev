@@ -55,11 +55,19 @@ spec:
             requests:
               cpu: 2
               memory: 8Gi
+          volumeMounts:
+            # Optional PVC mount at /workspace (uncomment and set claimName below)
+            # - name: workspace
+            #   mountPath: /workspace
+            - name: publicdata
+              mountPath: /hf
+              readOnly: true
       # Uncomment and set claimName to mount a PVC at /workspace
-      # volumes:
-      #   - name: workspace
-      #     persistentVolumeClaim:
-      #       claimName: YOUR_PVC_NAME
-      # volumeMounts (in container):
-      #   - name: workspace
-      #     mountPath: /workspace
+      volumes:
+        # - name: workspace
+        #   persistentVolumeClaim:
+        #     claimName: YOUR_PVC_NAME
+        - name: publicdata
+          nfs:
+            server: 10.24.1.255
+            path: /public/hf
