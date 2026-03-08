@@ -108,7 +108,6 @@ pkill -f 'port-forward.*22222:22'
 - **Tmux logging to PVC:** To log all tmux output to a file on your workspace PVC, set `LOG_TO_PVC` before creating the pod. Every pane is logged: the first pane when you run `tmux new -s X`, and each new pane when you split (e.g. Ctrl+b % or "). Logs go to `/workspace/writeable/data/logs/<session-name>-<timestamp>.log`. Only takes effect when the pod is created (not when reconnecting).
   - **With the script:** `export LOG_TO_PVC=1` then run `source ~/eidf-dev/eidf-dev-up.sh`.
   - **With the static template:** `LOG_TO_PVC=1 envsubst < dev-pod.yaml | kubectl create -f -` (replace `dev-pod.yaml` with your edited template path). Without `LOG_TO_PVC=1`, envsubst leaves the value empty and logging is disabled.
-  - **Test locally before deploying:** From the repo run `./test-tmux-logging.sh` to check that tmux accepts the hook (syntax check). To test that logging works, run `TEST_LOG_DIR=/tmp/tmux-logs ./test-tmux-logging.sh`, then start tmux, split a pane, and inspect `ls /tmp/tmux-logs/`.
 
 ---
 
