@@ -56,6 +56,8 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
 | **eidf-create-pvc.sh** | Cluster login node | Create a new PVC (name and size). Run standalone or when eidf-dev-up.sh prompts. Usage: `bash eidf-create-pvc.sh` or `bash eidf-create-pvc.sh my-pvc 100Gi` |
 | **connect-dev.sh** | Cluster login node | Connect only: copy keys + port-forward to an existing dev pod |
 
+The **modules/** directory holds optional feature modules (e.g. tmux log-to-PVC) sourced by `eidf-dev-up.sh`; see `modules/README.md`.
+
 ---
 
 ## Creating a PVC (standalone)
