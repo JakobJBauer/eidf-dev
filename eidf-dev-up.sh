@@ -13,6 +13,7 @@ PORT="${EIDF_DEV_PORT:-22222}"
 ENABLE_PUBLIC_HF="${EIDF_PUBLIC_HF:-1}"
 # NFS server for public HF; override with INFK8S_NFS_SERVER_IP if set
 HF_NFS_SERVER="${INFK8S_NFS_SERVER_IP:-10.24.1.255}"
+# Tmux: log all panes to PVC when LOG_TO_PVC is set (e.g. export LOG_TO_PVC=1)
 BASE_NAME="${EIDF_USER}-dev-"
 EIDF_QUEUE="${EIDF_QUEUE:-eidf107ns-user-queue}"
 EIDF_DEV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
@@ -161,6 +162,49 @@ else
   MOUNTS_BLOCK=""
 fi
 
+# --- Optional tmux logging to PVC (when LOG_TO_PVC is set) ---
+# Uses same approach as test-tmux-logging.sh: helper script + after-new-session, after-new-window, after-split-window.
+LOG_TO_PVC_ENV=""
+TMUX_LOG_STARTUP=""
+if [[ -n "${LOG_TO_PVC:-}" ]]; then
+  LOG_TO_PVC_ENV="
+          env:
+            - name: LOG_TO_PVC
+              value: \"1\""
+  # Encode as base64 so we don't break YAML (heredocs would need unindented delimiters).
+  TMUX_SETUP_SCRIPT='mkdir -p /workspace/writeable/data/logs
+cat > /workspace/writeable/data/logs/tmux-hook.sh << '\''HOOKEND'\''
+#!/bin/sh
+LOG_DIR="/workspace/writeable/data/logs"
+SESSION_ID="$1"
+SESSION_NAME="$2"
+PANE_ID="$3"
+mkdir -p "$LOG_DIR"
+if [ -z "$PANE_ID" ]; then
+  PANE_ID=$(tmux list-panes -t "$SESSION_ID" -s -F '\''#{pane_id}'\'' 2>/dev/null | head -1)
+fi
+LOG=$(tmux show-options -t "$SESSION_ID" -vq @session_log_file 2>/dev/null)
+if [ -z "$LOG" ]; then
+  LOG="$LOG_DIR/${SESSION_NAME}-$(date +%Y%m%d_%H%M%S).log"
+  tmux set-option -t "$SESSION_ID" @session_log_file "$LOG"
+fi
+if [ -n "$PANE_ID" ]; then
+  tmux pipe-pane -t "$PANE_ID" -o "cat >> $LOG" &
+fi
+HOOKEND
+chmod +x /workspace/writeable/data/logs/tmux-hook.sh
+cat >> /root/.tmux.conf << '\''CONFEND'\''
+set-hook -g after-new-session '\''run-shell "/workspace/writeable/data/logs/tmux-hook.sh #{session_id} #{session_name} #{pane_id}"'\''
+set-hook -g after-new-window '\''run-shell "/workspace/writeable/data/logs/tmux-hook.sh #{session_id} #{session_name} #{pane_id}"'\''
+set-hook -g after-split-window '\''run-shell "/workspace/writeable/data/logs/tmux-hook.sh #{session_id} #{session_name} #{pane_id}"'\''
+CONFEND'
+  TMUX_SETUP_B64=$(echo -n "$TMUX_SETUP_SCRIPT" | base64 -w0)
+  TMUX_LOG_STARTUP="
+              if [ -n \"\\\$LOG_TO_PVC\" ]; then
+                echo \"${TMUX_SETUP_B64}\" | base64 -d | bash
+              fi"
+fi
+
 # --- Resource block: omit GPU when 0 ---
 if [ "$GPU_COUNT" -eq 0 ]; then
   RESOURCES="
@@ -218,6 +262,7 @@ spec:
               protocol: TCP
           imagePullPolicy: IfNotPresent
           workingDir: /workspace
+          ${LOG_TO_PVC_ENV}
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -231,6 +276,7 @@ spec:
               [ -f /root/.bashrc ] || cp /etc/skel/.bashrc /root/.bashrc
               sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/' /root/.bashrc || true
               echo 'cd /workspace/writeable 2>/dev/null || true' >> /root/.bashrc
+              ${TMUX_LOG_STARTUP}
               sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
               ssh-keygen -A
               /usr/sbin/sshd
