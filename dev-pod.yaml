@@ -24,7 +24,7 @@ spec:
       labels:
         eidf/user: YOUR_EIDF_USER
     spec:
-      activeDeadlineSeconds: 43200
+      activeDeadlineSeconds: 259200 # 3 days
       restartPolicy: Never
       containers:
         - name: dev

@@ -1,6 +1,6 @@
 # EIDF dev modules
 
-Optional modules sourced by `eidf-dev-up.sh` to keep the main script smaller and features pluggable.
+Optional modules sourced by `eidf-dev-up.sh`.
 
 | Module | Purpose |
 |--------|--------|

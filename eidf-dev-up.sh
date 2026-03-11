@@ -217,7 +217,7 @@ spec:
       labels:
         eidf/user: ${EIDF_USER}
     spec:
-      activeDeadlineSeconds: 43200
+      activeDeadlineSeconds: 259200 # 3 days, inline with cluster enforcements
       restartPolicy: Never
       ${NODE_SELECTOR}
       containers:
