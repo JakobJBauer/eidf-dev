@@ -1,10 +1,10 @@
 # EIDF dev pod – SSH from Cursor in one command
 
 One-command setup to get a **dev pod** on the EIDF GPU cluster (or similar Kubernetes setup) with SSH, so you can use **Cursor** or any IDE over **Remote-SSH** with a single host (`eidf-dev`).
-
-Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf107`); scripts use that and infer your PVCs from `kubectl`.
-
 ---
+
+**Prerequisite:**
+You need to be able to ssh into the cluster and have you ssh-config set up accordingly. (e.g. `ssh eidf_cluster` should get you into the cluster)
 
 ## One-command setup (from your laptop)
 
@@ -17,7 +17,7 @@ Works for **any user**: the cluster login node sets `$USER` (e.g. `s2838806-eidf
    bash setup.sh
    ```
 
-   If you get "Permission denied", use `bash setup.sh` (no execute bit needed) or run `chmod +x setup.sh` then `./setup.sh`.
+   If you get "Permission denied", run `chmod +x setup.sh` then `./setup.sh`.
 
    When prompted, enter your **SSH host alias** for the cluster (e.g. `eidf_cluster`).  
    Or pass it directly: `bash setup.sh eidf_cluster`
