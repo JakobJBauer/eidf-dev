@@ -222,7 +222,7 @@ spec:
       ${NODE_SELECTOR}
       containers:
         - name: dev
-          image: ubuntu:24.04
+          image: ubuntu:26.04
           ports:
             - containerPort: 22
               protocol: TCP
